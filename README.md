@@ -1,6 +1,6 @@
 # Agency Orchestrator 可视化控制台
 
-为 [Agency Orchestrator](https://github.com/your-repo/agency-orchestrator) 多智能体编排引擎提供图形化操作界面，支持中文角色库与工作流模板。
+为 [Agency Orchestrator](https://github.com/jnMetaCode/agency-agents-zh) 多智能体编排引擎提供图形化操作界面，支持中文角色库与工作流模板。
 
 ## 功能特性
 
@@ -14,21 +14,47 @@
 
 ## 快速开始
 
-### 前置条件
+### 使用前提
 
-- Node.js >= 16
-- 已安装 [Agency Orchestrator CLI](https://github.com/your-repo/agency-orchestrator)（`ao` 命令可用）
-- 已配置至少一个 LLM Provider 的 API Key
+使用本项目前，需要完成以下三步准备工作：
 
-### 1. 安装依赖
+#### 1. 全局安装 Agency Orchestrator
+
+```bash
+npm install -g agency-orchestrator
+```
+
+安装完成后确认 `ao` 命令可用：
+
+```bash
+ao --version
+```
+
+#### 2. 下载角色库项目
+
+```bash
+git clone https://github.com/jnMetaCode/agency-agents-zh.git
+```
+
+记下克隆目录的绝对路径，例如 `D:/SourceCode/agency-agents-zh`。
+
+#### 3. 配置 LLM Provider
+
+至少配置一个 LLM Provider 的 API Key，详见下方 [支持的 LLM Provider](#支持的-llm-provider) 章节。
+
+---
+
+### 安装与启动
+
+#### 1. 安装本项目依赖
 
 ```bash
 npm install
 ```
 
-### 2. 配置工作目录
+#### 2. 配置工作目录
 
-设置 `AO_CWD` 环境变量指向你本机的 `agency-agents-zh`（或 `agency-orchestrator`）仓库路径：
+设置 `AO_CWD` 环境变量指向你本机的 `agency-agents-zh` 仓库路径：
 
 ```bash
 # Windows PowerShell
@@ -44,7 +70,7 @@ export AO_CWD=/path/to/agency-agents-zh
 const AO_CWD = process.env.AO_CWD || path.resolve('D:/SourceCode/agency-agents-zh');
 ```
 
-### 3. 启动服务
+#### 3. 启动服务
 
 ```bash
 npm start
