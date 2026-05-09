@@ -411,6 +411,33 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
+// GET /api/role/:path - 获取角色 MD 文件内容
+app.get('/api/role/:path(*)', async (req, res) => {
+  const rolePath = req.params.path;
+  if (!rolePath) {
+    return res.status(400).json({ success: false, error: 'path 参数必填' });
+  }
+
+  const mdPath = path.join(AGENTS_DIR, rolePath + '.md');
+
+  // 安全检查：防止路径遍历
+  const resolved = path.resolve(mdPath);
+  if (!resolved.startsWith(path.resolve(AGENTS_DIR))) {
+    return res.status(403).json({ success: false, error: '非法路径' });
+  }
+
+  if (!fs.existsSync(resolved)) {
+    return res.status(404).json({ success: false, error: `角色文件不存在: ${rolePath}` });
+  }
+
+  try {
+    const content = fs.readFileSync(resolved, 'utf-8');
+    res.json({ success: true, path: rolePath, content });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/roles - 获取角色目录
 app.get('/api/roles', async (req, res) => {
   try {

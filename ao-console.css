@@ -606,6 +606,61 @@ select option { background: var(--bg-3); }
   border: 1px solid rgba(99,102,241,.15);
 }
 .role-orig { background: rgba(245,158,11,.1); color: var(--warning); border-color: rgba(245,158,11,.2); }
+.role-preview-btn {
+  opacity: 0; transition: opacity var(--t-base);
+  font-size: 14px; padding: 2px 6px; flex-shrink: 0;
+}
+.role-card:hover .role-preview-btn { opacity: 1; }
+
+/* ================================================
+   ROLE PREVIEW MODAL
+   ================================================ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+.modal-panel {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--r-lg); width: 680px; max-width: 90vw;
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  transform: translateY(20px); transition: transform .2s;
+}
+.modal-overlay.active .modal-panel { transform: translateY(0); }
+
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-body {
+  padding: 20px; overflow-y: auto; flex: 1;
+  font-size: 13px; line-height: 1.7; color: var(--text-2);
+}
+
+/* Markdown rendered content */
+.md-h { color: var(--text); margin: 16px 0 8px; font-weight: 700; }
+.md-h:first-child { margin-top: 0; }
+h2.md-h { font-size: 16px; }
+h3.md-h { font-size: 14px; }
+h4.md-h { font-size: 13px; }
+.md-code-block {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 12px 14px;
+  overflow-x: auto; margin: 10px 0; font-size: 12px;
+  line-height: 1.6;
+}
+.md-inline-code {
+  background: var(--bg-3); padding: 1px 6px; border-radius: 4px;
+  font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+.md-ul { padding-left: 20px; margin: 6px 0; }
+.md-ul li { margin: 3px 0; }
+.md-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 
 /* ================================================
    WORKFLOW BUILDER

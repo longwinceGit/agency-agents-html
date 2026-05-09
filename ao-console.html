@@ -385,5 +385,24 @@
 
 <!-- Main application logic -->
 <script src="ao-console.js"></script>
+
+<!-- 角色预览模态框 -->
+<div class="modal-overlay" id="role-preview-overlay" onclick="closeRolePreview()">
+  <div class="modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="rp-emoji" style="font-size:24px;">🤖</span>
+        <div>
+          <div id="rp-name" style="font-size:15px;font-weight:700;">角色名称</div>
+          <div id="rp-dept" style="font-size:12px;color:var(--text-3);">部门</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeRolePreview()" style="font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div class="modal-body" id="rp-content">
+      加载中…
+    </div>
+  </div>
+</div>
 </body>
 </html>

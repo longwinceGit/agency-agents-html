@@ -625,6 +625,9 @@ function searchRoles(q) {
     card.className = 'role-card';
     const toolTags = (r.tools || []).map(t => `<span class="role-tool">${t}</span>`).join('');
     const origTag = r.original ? '<span class="role-tool role-orig">原创</span>' : '';
+    const safePath = (r.path || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeName = (r.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeDept = (r.deptName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     card.innerHTML = `
       <div class="role-header">
         <div class="role-avatar">${r.emoji || '🤖'}</div>
@@ -632,6 +635,7 @@ function searchRoles(q) {
           <div class="role-name">${r.name}</div>
           <div class="role-dept">${r.deptName}</div>
         </div>
+        <button class="btn btn-ghost btn-sm role-preview-btn" onclick="previewRole(event, '${safePath}', '${r.emoji || '🤖'}', '${safeName}', '${safeDept}')" title="预览角色详情">👁</button>
       </div>
       <div class="role-desc">${r.description}</div>
       ${toolTags || origTag ? `<div class="role-tools">${toolTags}${origTag}</div>` : ''}
@@ -644,6 +648,96 @@ function searchRoles(q) {
     grid.appendChild(card);
   });
 }
+
+/* ========================================================
+   ROLE PREVIEW
+   ======================================================== */
+async function previewRole(evt, rolePath, emoji, name, dept) {
+  evt.stopPropagation();
+  if (!rolePath) { showToast('缺少角色路径', 'warn'); return; }
+
+  const overlay = document.getElementById('role-preview-overlay');
+  const rpEmoji = document.getElementById('rp-emoji');
+  const rpName = document.getElementById('rp-name');
+  const rpDept = document.getElementById('rp-dept');
+  const rpContent = document.getElementById('rp-content');
+
+  rpEmoji.textContent = emoji || '🤖';
+  rpName.textContent = name || '';
+  rpDept.textContent = dept || '';
+  rpContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">加载中…</div>';
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const data = await api('GET', `/api/role/${rolePath.split('/').map(s => encodeURIComponent(s)).join('/')}`);
+    if (data.success && data.content) {
+      rpContent.innerHTML = renderMarkdown(data.content);
+    } else {
+      rpContent.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warning)">加载失败: ${data.error || '未知错误'}</div>`;
+    }
+  } catch (err) {
+    rpContent.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warning)">请求失败: ${err.message}</div>`;
+  }
+}
+
+function closeRolePreview() {
+  const overlay = document.getElementById('role-preview-overlay');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// 简易 Markdown → HTML 渲染（无需第三方库）
+function renderMarkdown(md) {
+  let html = md;
+
+  // 移除 frontmatter
+  html = html.replace(/^---\n[\s\S]*?\n---\n?/, '');
+
+  // 代码块
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<pre class="md-code-block"><code class="lang-${lang || 'text'}">${escaped}</code></pre>`;
+  });
+
+  // 行内代码
+  html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+
+  // 标题
+  html = html.replace(/^### (.+)$/gm, '<h4 class="md-h">$1</h4>');
+  html = html.replace(/^## (.+)$/gm, '<h3 class="md-h">$1</h3>');
+  html = html.replace(/^# (.+)$/gm, '<h2 class="md-h">$1</h2>');
+
+  // 粗体 / 斜体
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // 无序列表
+  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul class="md-ul">$1</ul>');
+  // 合并相邻 ul
+  html = html.replace(/<\/ul>\s*<ul class="md-ul">/g, '');
+
+  // 有序列表
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+  // 水平线
+  html = html.replace(/^---+$/gm, '<hr class="md-hr">');
+
+  // 段落（连续非空行）
+  html = html.replace(/\n{2,}/g, '\n</p><p>\n');
+
+  // 换行
+  html = html.replace(/\n/g, '<br>');
+
+  return `<p>${html}</p>`;
+}
+
+// ESC 关闭模态框
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeRolePreview();
+});
 
 function addAllToBuilder() {
   const selected = document.querySelectorAll('#roles-grid .role-card.selected');
@@ -685,12 +779,16 @@ async function renderBuilderRoles(q) {
     const safeDesc = (r.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     const safeName = (r.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     const safeDept = (r.deptName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safePath = (r.path || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     item.innerHTML = `
       <span style="display:flex;align-items:center;gap:8px;font-size:12px;overflow:hidden">
         <span style="font-size:15px;flex-shrink:0">${r.emoji || '🤖'}</span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name || ''}</span>
       </span>
-      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;" onclick="addToBuilder(event, '${r.emoji || '🤖'}', '${safeName}', '${safeDept}', '${safeDesc}')">+</button>
+      <span style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 5px;" onclick="previewRole(event, '${safePath}', '${r.emoji || '🤖'}', '${safeName}', '${safeDept}')" title="预览">👁</button>
+        <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;" onclick="addToBuilder(event, '${r.emoji || '🤖'}', '${safeName}', '${safeDept}', '${safeDesc}')">+</button>
+      </span>
     `;
     el.appendChild(item);
   });
