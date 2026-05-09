@@ -174,4 +174,4 @@ SSE 端点（`/api/compose/stream`、`/api/run/stream`、`/api/single-role/run/s
 
 ## 许可证
 
-MIT
+MIT License — 自由使用，商业或个人均可。
