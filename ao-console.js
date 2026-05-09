@@ -635,7 +635,10 @@ function searchRoles(q) {
           <div class="role-name">${r.name}</div>
           <div class="role-dept">${r.deptName}</div>
         </div>
-        <button class="btn btn-ghost btn-sm role-preview-btn" onclick="previewRole(event, '${safePath}', '${r.emoji || '🤖'}', '${safeName}', '${safeDept}')" title="预览角色详情">👁</button>
+        <div style="display:flex;gap:2px;flex-shrink:0;">
+          <button class="btn btn-ghost btn-sm role-preview-btn" onclick="previewRole(event, '${safePath}', '${r.emoji || '🤖'}', '${safeName}', '${safeDept}')" title="预览角色详情">👁</button>
+          <button class="btn btn-ghost btn-sm role-preview-btn" onclick="downloadRoleMdDirect(event, '${safePath}', '${safeName}')" title="导出MD文件">⬇</button>
+        </div>
       </div>
       <div class="role-desc">${r.description}</div>
       ${toolTags || origTag ? `<div class="role-tools">${toolTags}${origTag}</div>` : ''}
@@ -661,11 +664,18 @@ async function previewRole(evt, rolePath, emoji, name, dept) {
   const rpName = document.getElementById('rp-name');
   const rpDept = document.getElementById('rp-dept');
   const rpContent = document.getElementById('rp-content');
+  const rpDownloadBtn = document.getElementById('rp-download-btn');
 
   rpEmoji.textContent = emoji || '🤖';
   rpName.textContent = name || '';
   rpDept.textContent = dept || '';
   rpContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">加载中…</div>';
+  rpDownloadBtn.style.display = 'none';
+
+  // 存储到全局，供下载使用
+  window._rpRawContent = '';
+  window._rpRolePath = rolePath;
+  window._rpRoleName = name || 'role';
 
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
@@ -673,12 +683,58 @@ async function previewRole(evt, rolePath, emoji, name, dept) {
   try {
     const data = await api('GET', `/api/role/${rolePath.split('/').map(s => encodeURIComponent(s)).join('/')}`);
     if (data.success && data.content) {
+      window._rpRawContent = data.content;
       rpContent.innerHTML = renderMarkdown(data.content);
+      rpDownloadBtn.style.display = '';
     } else {
       rpContent.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warning)">加载失败: ${data.error || '未知错误'}</div>`;
     }
   } catch (err) {
     rpContent.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warning)">请求失败: ${err.message}</div>`;
+  }
+}
+
+function downloadRoleMd() {
+  const content = window._rpRawContent;
+  if (!content) { showToast('无内容可导出', 'warn'); return; }
+
+  const roleName = window._rpRoleName || 'role';
+  const fileName = roleName.replace(/[\\/:*?"<>|]/g, '_') + '.md';
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`已导出: ${fileName}`, 'success');
+}
+
+async function downloadRoleMdDirect(evt, rolePath, name) {
+  evt.stopPropagation();
+  if (!rolePath) { showToast('缺少角色路径', 'warn'); return; }
+
+  try {
+    const data = await api('GET', `/api/role/${rolePath.split('/').map(s => encodeURIComponent(s)).join('/')}`);
+    if (data.success && data.content) {
+      const fileName = (name || 'role').replace(/[\\/:*?"<>|]/g, '_') + '.md';
+      const blob = new Blob([data.content], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`已导出: ${fileName}`, 'success');
+    } else {
+      showToast(`导出失败: ${data.error || '未知错误'}`, 'warn');
+    }
+  } catch (err) {
+    showToast(`导出失败: ${err.message}`, 'warn');
   }
 }
 
@@ -787,6 +843,7 @@ async function renderBuilderRoles(q) {
       </span>
       <span style="display:flex;gap:4px;flex-shrink:0;">
         <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 5px;" onclick="previewRole(event, '${safePath}', '${r.emoji || '🤖'}', '${safeName}', '${safeDept}')" title="预览">👁</button>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 5px;" onclick="downloadRoleMdDirect(event, '${safePath}', '${safeName}')" title="导出MD">⬇</button>
         <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;" onclick="addToBuilder(event, '${r.emoji || '🤖'}', '${safeName}', '${safeDept}', '${safeDesc}')">+</button>
       </span>
     `;

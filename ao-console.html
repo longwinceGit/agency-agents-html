@@ -397,7 +397,10 @@
           <div id="rp-dept" style="font-size:12px;color:var(--text-3);">部门</div>
         </div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="closeRolePreview()" style="font-size:18px;line-height:1;">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-secondary btn-sm" id="rp-download-btn" onclick="downloadRoleMd()" style="font-size:12px;display:none;">⬇ 导出MD</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeRolePreview()" style="font-size:18px;line-height:1;">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="rp-content">
       加载中…
