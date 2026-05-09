@@ -232,6 +232,7 @@ SSE 端点（`/api/compose/stream`、`/api/run/stream`、`/api/single-role/run/s
 - Express 4.x 静态文件服务 + REST API + SSE 流式转发
 - `child_process.spawn` 调用 `ao` CLI，实时转发 stdout/stderr
 - `parseAoOutput()` 解析 CLI 中文输出为结构化事件（支持 ANSI 转义码清理、Emoji + Unicode 变体选择器处理）
+- `fixAgentsDir()` 自动修复 `ao compose` 生成的 YAML 中 `agents_dir` 为 `agency-agents-zh`（CLI 默认生成 `agency-agents` 会导致运行报错）
 - `res.on('close')` + SSE 心跳确保连接稳定性
 
 ## 环境变量

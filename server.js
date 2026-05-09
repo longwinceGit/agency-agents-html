@@ -516,6 +516,14 @@ app.get('/api/workflow/:id(*)', async (req, res) => {
   }
 });
 
+// 修复 ao compose 生成 YAML 中的 agents_dir（默认为 agency-agents，需改为 agency-agents-zh）
+function fixAgentsDir(yamlContent) {
+  return yamlContent.replace(
+    /agents_dir:\s*["']?agency-agents(?!-zh)["']?/,
+    'agents_dir: "agency-agents-zh"'
+  );
+}
+
 // POST /api/compose - 等价 ao compose
 app.post('/api/compose', async (req, res) => {
   const { description, provider, lang, autoRun, concurrency } = req.body || {};
@@ -528,57 +536,68 @@ app.post('/api/compose', async (req, res) => {
   const outputFileName = `composed-${Date.now()}.yaml`;
   const yamlPath = path.join(WORKFLOWS_DIR, outputFileName);
 
-  const args = ['compose', description];
+  // 先生成 YAML（不使用 --run，避免 agents_dir 错误导致执行失败）
+  const composeArgs = ['compose', description, '--output', yamlPath];
 
   if (provider) {
-    args.push('--provider', String(provider));
+    composeArgs.push('--provider', String(provider));
   }
   if (lang === 'zh' || lang === 'en') {
-    args.push('--lang', lang);
+    composeArgs.push('--lang', lang);
   }
   if (concurrency) {
-    args.push('--concurrency', String(concurrency));
-  }
-  if (autoRun) {
-    args.push('--run');
-  } else {
-    // 只生成 YAML 时，指定输出文件路径
-    args.push('--output', yamlPath);
+    composeArgs.push('--concurrency', String(concurrency));
   }
 
   try {
-    const result = await runAoCommand(args);
+    const composeResult = await runAoCommand(composeArgs);
 
-    // 如果是纯生成 YAML（没有 --run）
-    if (!autoRun && result.code === 0) {
-      // 检查输出文件是否存在
-      if (fs.existsSync(yamlPath)) {
-        // 读取生成的 YAML 内容
-        const yamlContent = fs.readFileSync(yamlPath, 'utf-8');
-        result.yaml = yamlContent;
-        result.yamlPath = yamlPath;
-        result.yamlRelativePath = outputFileName;
+    if (composeResult.code !== 0) {
+      return res.json(composeResult);
+    }
 
-        // 清理临时生成的文件（只保留在 result 中）
-        try {
-          fs.unlinkSync(yamlPath);
-        } catch (e) {}
-      } else {
-        // 尝试从 stdout 中提取 YAML
-        result.stdout = result.stdout || '';
-        const yamlMatch = result.stdout.match(/^name:[\s\S]*$/m);
-        if (yamlMatch) {
-          const yamlContent = yamlMatch[0].trim();
-          result.yaml = yamlContent;
-          result.yamlPath = yamlPath;
+    // 读取并修复生成的 YAML
+    let yamlContent = '';
+    let yamlFilePath = yamlPath;
 
-          // 保存到临时文件供后续使用
-          fs.writeFileSync(yamlPath, yamlContent, 'utf-8');
-        }
+    if (fs.existsSync(yamlPath)) {
+      yamlContent = fs.readFileSync(yamlPath, 'utf-8');
+    } else {
+      // 尝试从 stdout 中提取 YAML
+      composeResult.stdout = composeResult.stdout || '';
+      const yamlMatch = composeResult.stdout.match(/^name:[\s\S]*$/m);
+      if (yamlMatch) {
+        yamlContent = yamlMatch[0].trim();
       }
     }
 
-    res.json(result);
+    // 修复 agents_dir
+    if (yamlContent) {
+      yamlContent = fixAgentsDir(yamlContent);
+      // 保存修复后的 YAML
+      fs.writeFileSync(yamlPath, yamlContent, 'utf-8');
+    }
+
+    // 如果需要自动运行，使用修复后的 YAML 执行 ao run
+    if (autoRun && yamlContent) {
+      const runResult = await runAoCommand(['run', yamlPath]);
+      composeResult.runOutput = runResult;
+      // 清理临时文件
+      try { fs.unlinkSync(yamlPath); } catch (e) {}
+      return res.json(composeResult);
+    }
+
+    // 只生成 YAML（不执行）
+    if (yamlContent) {
+      composeResult.yaml = yamlContent;
+      composeResult.yamlPath = yamlPath;
+      composeResult.yamlRelativePath = outputFileName;
+
+      // 清理临时生成的文件（只保留在 result 中）
+      try { fs.unlinkSync(yamlPath); } catch (e) {}
+    }
+
+    res.json(composeResult);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -808,21 +827,6 @@ app.post('/api/compose/stream', async (req, res) => {
     return res.status(400).json({ success: false, error: 'description 字段必填' });
   }
 
-  const args = ['compose', description];
-
-  if (provider) {
-    args.push('--provider', String(provider));
-  }
-  if (lang === 'zh' || lang === 'en') {
-    args.push('--lang', lang);
-  }
-  if (concurrency) {
-    args.push('--concurrency', String(concurrency));
-  }
-  if (autoRun) {
-    args.push('--run');
-  }
-
   // 设置 SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -832,40 +836,122 @@ app.post('/api/compose/stream', async (req, res) => {
   // 发送心跳确保连接活跃
   res.write(':\n\n');
 
-  let plannedSteps = null; // 缓存头部解析出的步骤列表
+  // 第一阶段：ao compose 生成 YAML（不使用 --run，避免 agents_dir 错误）
+  const outputFileName = `composed-${Date.now()}.yaml`;
+  const yamlPath = path.join(WORKFLOWS_DIR, outputFileName);
 
-  const child = runAoCommandStream(args, (data) => {
-    // 先发送原始输出
+  const composeArgs = ['compose', description, '--output', yamlPath];
+  if (provider) {
+    composeArgs.push('--provider', String(provider));
+  }
+  if (lang === 'zh' || lang === 'en') {
+    composeArgs.push('--lang', lang);
+  }
+  if (concurrency) {
+    composeArgs.push('--concurrency', String(concurrency));
+  }
+
+  let plannedSteps = null;
+  let composeStdout = '';
+
+  const composeChild = runAoCommandStream(composeArgs, (data) => {
+    // 转发原始输出
     res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-    // 尝试解析结构化信息
     if (data.type === 'stdout' && data.text) {
+      composeStdout += data.text;
       const events = parseAoOutput(data.text);
       for (const evt of events) {
         if (evt.type === 'plan') {
           plannedSteps = evt.steps;
-        }
-        // 为 step 事件补充序号
-        if (evt.type === 'step' && plannedSteps) {
-          const idx = plannedSteps.findIndex(s => s.name === evt.name || s.role === evt.name);
-          if (idx >= 0) {
-            evt.index = idx;
-            evt.id = plannedSteps[idx].id;
-          }
         }
         res.write(`data: ${JSON.stringify(evt)}\n\n`);
       }
     }
   });
 
-  child.on('close', (code) => {
-    res.write(`data: ${JSON.stringify({ type: 'close', code, steps: plannedSteps })}\n\n`);
-    res.end();
-  });
+  // 等待 compose 完成
+  await new Promise((resolve) => {
+    composeChild.on('close', (code) => {
+      if (code !== 0) {
+        res.write(`data: ${JSON.stringify({ type: 'close', code, phase: 'compose' })}\n\n`);
+        res.end();
+      }
+      resolve(code);
+    });
+    res.on('close', () => {
+      composeChild.kill();
+      resolve(-1);
+    });
+  }).then(async (code) => {
+    if (code !== 0) return;
 
-  // 使用 res.on('close') 而不是 req.on('close') 来检测客户端断连
-  res.on('close', () => {
-    child.kill();
+    // 读取并修复生成的 YAML
+    let yamlContent = '';
+    if (fs.existsSync(yamlPath)) {
+      yamlContent = fs.readFileSync(yamlPath, 'utf-8');
+    } else if (composeStdout) {
+      const yamlMatch = composeStdout.match(/^name:[\s\S]*$/m);
+      if (yamlMatch) {
+        yamlContent = yamlMatch[0].trim();
+      }
+    }
+
+    if (yamlContent) {
+      yamlContent = fixAgentsDir(yamlContent);
+      fs.writeFileSync(yamlPath, yamlContent, 'utf-8');
+    }
+
+    // 发送 YAML 生成完成的元数据事件
+    res.write(`data: ${JSON.stringify({ type: 'meta', yamlPath, yamlContent, phase: 'compose_done' })}\n\n`);
+
+    // 第二阶段：如果需要自动运行，使用修复后的 YAML 执行 ao run
+    if (autoRun && yamlContent) {
+      const runArgs = ['run', yamlPath];
+      if (provider) {
+        runArgs.push('--provider', String(provider));
+      }
+      if (concurrency) {
+        runArgs.push('--concurrency', String(concurrency));
+      }
+
+      const runChild = runAoCommandStream(runArgs, (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+        if (data.type === 'stdout' && data.text) {
+          const events = parseAoOutput(data.text);
+          for (const evt of events) {
+            if (evt.type === 'plan') {
+              plannedSteps = evt.steps;
+            }
+            if (evt.type === 'step' && plannedSteps) {
+              const idx = plannedSteps.findIndex(s => s.name === evt.name || s.role === evt.name);
+              if (idx >= 0) {
+                evt.index = idx;
+                evt.id = plannedSteps[idx].id;
+              }
+            }
+            res.write(`data: ${JSON.stringify(evt)}\n\n`);
+          }
+        }
+      });
+
+      runChild.on('close', (runCode) => {
+        // 清理临时文件
+        try { fs.unlinkSync(yamlPath); } catch (e) {}
+        res.write(`data: ${JSON.stringify({ type: 'close', code: runCode, steps: plannedSteps, phase: 'run' })}\n\n`);
+        res.end();
+      });
+
+      res.on('close', () => {
+        runChild.kill();
+      });
+    } else {
+      // 不运行，只返回生成的 YAML
+      try { fs.unlinkSync(yamlPath); } catch (e) {}
+      res.write(`data: ${JSON.stringify({ type: 'close', code: 0, steps: plannedSteps, phase: 'compose' })}\n\n`);
+      res.end();
+    }
   });
 });
 
