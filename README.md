@@ -14,19 +14,19 @@
 
 ## 运行截图
 
-![自动编排视图](https://github.com/longwinceGit/agency-agents-html/blob/main/runpic/1.png)
+![自动编排视图](./images/1.png)
 *自动编排视图 — 左侧输入需求描述，右侧实时展示工作流与执行进度*
 
-![工作流构建视图](./runpic/2.png)
+![工作流构建视图](./images/2.png)
 *工作流构建器 — 从角色库中手动选择角色，拖拽构建自定义工作流*
 
-![角色库视图](./runpic/3.png)
+![角色库视图](./images/3.png)
 *角色库浏览 — 按部门分类浏览 180+ AI 角色，支持搜索与批量添加*
 
-![模板库视图](./runpic/4.png)
+![模板库视图](./images/4.png)
 *模板库 — 内置工作流模板一键载入运行，支持 YAML 预览*
 
-![运行实时输出](./runpic/5.png)
+![运行实时输出](./images/5.png)
 *自动编排运行中 — 工作流步骤列表、DAG 图、实时日志、YAML 预览四面板同步更新*
 
 ## 快速开始
@@ -151,7 +151,7 @@ npm start
 │   └── data/
 │       └── agent-catalog.js # 角色库前端降级数据
 ├── oripic/                  # 设计原型文档与截图
-├── runpic/                  # 系统运行截图
+├── images/                  # 系统运行截图
 ├── tmp-workflows/           # 临时工作流文件（自动清理）
 ├── ao-outputs/              # 运行输出目录
 ├── CODE_REVIEW.md           # 代码质量审查报告
