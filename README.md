@@ -1,16 +1,24 @@
-# AO 可视化控制台
+# Agency Orchestrator 可视化控制台
 
-为 [Agency Orchestrator](https://github.com/your-repo/agency-orchestrator) 提供图形化操作界面。
+为 [Agency Orchestrator](https://github.com/your-repo/agency-orchestrator) 多智能体编排引擎提供图形化操作界面，支持中文角色库与工作流模板。
 
 ## 功能特性
 
-- 🎯 **自动编排**：一句话需求，自动选角色 + 设计 DAG + 生成工作流
-- 🎭 **角色组合**：可视化选择 180 个 AI 角色，配置依赖关系，运行自定义工作流
-- 👤 **单角色运行**：快速测试单个 AI 角色
-- 📋 **模板工作流**：使用内置 39 个工作流模板
-- 🔀 **DAG 可视化**：预览工作流步骤与依赖关系
+- ✨ **自动编排**：输入自然语言需求，AI 自动选角色 + 设计 DAG + 生成并执行工作流（SSE 实时流式输出）
+- 🎯 **工作流构建**：从 180+ 角色库中手动选择、排序，构建自定义工作流并运行
+- 👥 **角色库浏览**：按部门分类浏览全部角色，支持搜索、筛选、批量添加
+- 📋 **模板库**：内置工作流模板一键载入运行，支持 YAML 预览
+- 🔀 **DAG 可视化**：运行后自动生成工作流有向无环图
+- 📄 **YAML 生成/预览/导出**：支持语法高亮的 YAML 查看、导出
+- 📟 **实时日志**：流式展示编排执行全过程，结构化解析步骤进度
 
 ## 快速开始
+
+### 前置条件
+
+- Node.js >= 16
+- 已安装 [Agency Orchestrator CLI](https://github.com/your-repo/agency-orchestrator)（`ao` 命令可用）
+- 已配置至少一个 LLM Provider 的 API Key
 
 ### 1. 安装依赖
 
@@ -20,14 +28,20 @@ npm install
 
 ### 2. 配置工作目录
 
-编辑 `package.json` 或设置环境变量：
+设置 `AO_CWD` 环境变量指向你本机的 `agency-agents-zh`（或 `agency-orchestrator`）仓库路径：
 
 ```bash
-# Windows
-set AO_CWD=d:/SourceCode/agency-orchestrator
+# Windows PowerShell
+$env:AO_CWD = "D:/SourceCode/agency-agents-zh"
 
 # Linux/Mac
-export AO_CWD=/path/to/agency-orchestrator
+export AO_CWD=/path/to/agency-agents-zh
+```
+
+或在 `server.js` 中直接修改默认值：
+
+```js
+const AO_CWD = process.env.AO_CWD || path.resolve('D:/SourceCode/agency-agents-zh');
 ```
 
 ### 3. 启动服务
@@ -36,89 +50,126 @@ export AO_CWD=/path/to/agency-orchestrator
 npm start
 ```
 
-然后访问 http://localhost:3000/ao-console.html
+访问 http://localhost:3000/ao-console.html
 
 ## 目录结构
 
 ```
 .
-├── ao-console.html      # 前端可视化界面
-├── server.js            # Express 后端服务
-├── package.json         # 项目配置
+├── ao-console.html          # 前端可视化界面
+├── ao-console.js            # 前端交互逻辑（SSE 流式解析、角色/模板渲染）
+├── ao-console.css           # 前端样式（深色主题，CSS 变量体系）
+├── server.js                # Express 后端服务（API + SSE 流式转发）
+├── package.json             # 项目配置
 ├── src/
 │   └── data/
-│       └── agent-catalog.js  # 角色库数据
-├── tmp-workflows/       # 临时工作流文件
-└── ao-outputs/          # 运行输出目录
+│       └── agent-catalog.js # 角色库前端降级数据
+├── oripic/                  # 设计原型文档与截图
+├── tmp-workflows/           # 临时工作流文件（自动清理）
+├── ao-outputs/              # 运行输出目录
+├── CODE_REVIEW.md           # 代码质量审查报告
+└── ao-visual-console-design.md  # 设计规格文档
 ```
 
 ## API 接口
 
+### 查询类
+
 | 方法 | 路径 | 描述 |
 |------|------|------|
-| GET | `/api/status` | 健康检查 |
-| GET | `/api/roles` | 获取角色目录（180 个角色） |
-| GET | `/api/workflows` | 获取模板列表（39 个模板） |
-| GET | `/api/workflow/:id` | 获取工作流详情 |
-| POST | `/api/compose` | 自动编排 |
-| POST | `/api/run` | 运行工作流 |
-| POST | `/api/template/run` | 运行模板 |
-| POST | `/api/single-role/run` | 单角色运行 |
-| POST | `/api/workflow/build` | 构建工作流 YAML |
-| POST | `/api/workflow/save` | 保存工作流 |
-| POST | `/api/workflow/run` | 运行自定义工作流 |
+| GET | `/api/status` | 健康检查，返回 `ao` 版本与工作目录 |
+| GET | `/api/roles` | 获取角色目录（按部门分组） |
+| GET | `/api/workflows` | 获取工作流模板列表（按分类分组） |
+| GET | `/api/workflow/:id` | 获取指定工作流详情及原始 YAML |
+| GET | `/api/outputs` | 获取历史运行输出列表 |
+
+### 编排与执行类
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| POST | `/api/compose` | 自动编排（仅生成 YAML，不执行） |
+| POST | `/api/compose/stream` | 自动编排（SSE 流式，支持 `--run`） |
+| POST | `/api/run` | 运行指定工作流（同步等待） |
+| POST | `/api/run/stream` | 运行工作流（SSE 流式） |
+| POST | `/api/single-role/run` | 单角色运行（同步等待） |
+| POST | `/api/single-role/run/stream` | 单角色运行（SSE 流式） |
+| POST | `/api/template/run` | 运行内置模板工作流 |
+
+### 工作流管理类
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| POST | `/api/workflow/build` | 构建工作流 YAML（对象 → YAML） |
+| POST | `/api/workflow/save` | 保存工作流到 `workflows/` 目录 |
+| POST | `/api/workflow/run` | 构建并运行自定义工作流 |
+| POST | `/api/validate` | 校验工作流 YAML |
+| POST | `/api/plan` | 查看执行计划（支持 `--explain`） |
+
+### SSE 流式事件类型
+
+SSE 端点（`/api/compose/stream`、`/api/run/stream`、`/api/single-role/run/stream`）会发送以下结构化事件：
+
+| 事件类型 | 描述 |
+|----------|------|
+| `plan` | 参与者列表解析，包含步骤数组 |
+| `step` | 步骤开始执行（⏳ 状态） |
+| `step_result` | 步骤执行详情（含当前进度 `currentStep/totalSteps`） |
+| `step_done` | 单步完成/失败（含耗时、token 数） |
+| `summary` | 执行汇总（完成步数、总耗时、总 token） |
+| `meta` | 元数据（工作流名、步骤数、YAML 生成路径等） |
+| `stdout` | 原始标准输出 |
+| `stderr` | 原始错误输出 |
+| `close` | 进程结束（含退出码） |
 
 ## 支持的 LLM Provider
 
 | Provider | 配置 | 说明 |
 |----------|------|------|
 | `deepseek` | API Key | API 付费 |
-| `claude-code` | Claude 会员 | 免费（Claude 会员） |
-| `gemini-cli` | Google 账号 | 免费 1000次/天 |
+| `claude-code` | Claude 会员 | 免费（需 Claude 会员） |
+| `gemini-cli` | Google 账号 | 免费 1000 次/天 |
 | `copilot-cli` | GitHub Copilot | 需要 Copilot 订阅 |
-| `codex-cli` | ChatGPT Plus/Pro | 需要订阅 |
 | `ollama` | 本地模型 | 免费（本地部署） |
 
 ## 角色库
 
-共 **180 个 AI 角色**，覆盖 **16 个部门**：
+共 **180 个 AI 角色**，覆盖 **17 个部门**：
 
-- 📢 营销部 (33)
-- 🔬 专项部 (29)
-- 🛠️ 工程部 (27)
-- 🎮 游戏开发 (20)
-- 🧪 测试部 (9)
-- 🎨 设计部 (8)
-- 💼 销售部 (8)
-- 🤝 支持部 (8)
-- 📋 项目管理 (6)
-- 🥽 空间计算 (6)
-- 📖 学术部 (6)
-- 📦 产品部 (5)
-- 🚚 供应链 (3)
-- 🏦 金融部 (3)
-- 👔 人力资源 (2)
-- ⚖️ 法务部 (2)
+| 部门 | 数量 | 部门 | 数量 |
+|------|------|------|------|
+| 📢 营销部 | 33 | 🧪 测试部 | 9 |
+| 🔬 专项部 | 29 | 🎨 设计部 | 8 |
+| 🛠️ 工程部 | 27 | 💼 销售部 | 8 |
+| 🎮 游戏开发 | 20 | 🤝 支持部 | 8 |
+| 💰 付费媒体 | — | 📋 项目管理 | 6 |
+| 🥽 空间计算 | 6 | 📖 学术部 | 6 |
+| 📦 产品部 | 5 | 🚚 供应链 | 3 |
+| 🏦 金融部 | 3 | 👔 人力资源 | 2 |
+| ⚖️ 法务部 | 2 | | |
 
 其中 **45 个中国原创角色**（微信、抖音、小红书、飞书、钉钉等）
 
-## 工作流模板
+## 技术架构
 
-共 **39 个内置模板**，分类如下：
+### 前端
 
-- 🛠️ 开发类 (7)：PR 审查、技术债务审计、安全审计等
-- 📢 营销类 (5)：竞品分析、小红书种草、SEO 内容矩阵等
-- 📊 数据/设计类 (4)：数据管道评审、仪表盘设计等
-- 🔧 运维类 (3)：事故复盘、SRE 健康检查、周报生成等
-- 📈 战略类 (4)：商业计划书，投资分析、法律咨询等
-- 👔 HR类 (2)：面试题设计、简历优化
-- 📋 通用类 (14)：一人公司全员大会、产品评审等
+- 纯 HTML/CSS/JS 单页应用，无框架依赖
+- 深色主题，CSS 变量驱动设计系统
+- SSE (Fetch + ReadableStream) 实现流式通信
+- 结构化事件解析 + 正则兜底双重策略
+
+### 后端
+
+- Express 4.x 静态文件服务 + REST API + SSE 流式转发
+- `child_process.spawn` 调用 `ao` CLI，实时转发 stdout/stderr
+- `parseAoOutput()` 解析 CLI 中文输出为结构化事件（支持 ANSI 转义码清理、Emoji + Unicode 变体选择器处理）
+- `res.on('close')` + SSE 心跳确保连接稳定性
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `AO_CWD` | `d:/SourceCode/agency-orchestrator` | agency-orchestrator 工作目录 |
+| `AO_CWD` | `D:/SourceCode/agency-agents-zh` | agency-orchestrator 工作目录（`ao` 命令执行路径） |
 | `PORT` | `3000` | 服务端口 |
 
 ## 许可证
