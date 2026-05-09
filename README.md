@@ -40,7 +40,50 @@ git clone https://github.com/jnMetaCode/agency-agents-zh.git
 
 #### 3. 配置 LLM Provider
 
-至少配置一个 LLM Provider 的 API Key，详见下方 [支持的 LLM Provider](#支持的-llm-provider) 章节。
+在 `agency-agents-zh` 项目根目录下新建 `.env` 文件，填入所选 Provider 的配置。以 DeepSeek 为例：
+
+```bash
+# 在 agency-agents-zh 目录下创建 .env
+# 例如：D:/SourceCode/agency-agents-zh/.env
+
+AO_PROVIDER=deepseek
+AO_MODEL=deepseek-reasoner
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+OPENAI_API_KEY=sk-your-key-here
+```
+
+其他 Provider 配置示例：
+
+<details>
+<summary>Claude Code</summary>
+
+```bash
+AO_PROVIDER=claude-code
+# 无需 API Key，需 Claude 会员登录
+```
+</details>
+
+<details>
+<summary>Gemini CLI</summary>
+
+```bash
+AO_PROVIDER=gemini-cli
+# 无需 API Key，需 Google 账号登录，免费 1000 次/天
+```
+</details>
+
+<details>
+<summary>Ollama（本地部署）</summary>
+
+```bash
+AO_PROVIDER=ollama
+AO_MODEL=qwen2.5:7b
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=ollama
+```
+</details>
+
+> 💡 更多 Provider 详见下方 [支持的 LLM Provider](#支持的-llm-provider) 章节。
 
 ---
 
