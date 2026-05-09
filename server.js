@@ -173,8 +173,8 @@ async function parseAgentCatalog() {
   const categoryMap = {
     'marketing': '📢 营销部',
     'engineering': '🛠️ 工程部',
-    'specialist': '🔬 专项部',
-    'game-dev': '🎮 游戏开发',
+    'specialized': '🔬 专项部',
+    'game-development': '🎮 游戏开发',
     'testing': '🧪 测试部',
     'design': '🎨 设计部',
     'sales': '💼 销售部',
