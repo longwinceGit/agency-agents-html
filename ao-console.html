@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agency Orchestrator · 智能体调度平台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ao-console.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============================================================
+       TOPBAR
+       ============================================================ -->
+  <header class="topbar">
+    <a class="logo" href="#">
+      <div class="logo-mark">🔗</div>
+      <span>Agency Orchestrator</span>
+    </a>
+
+    <div class="topbar-divider"></div>
+
+    <nav class="topbar-nav">
+      <button class="nav-btn active" data-view="compose" onclick="switchView('compose', this)">
+        <span class="icon">✨</span> 自动编排
+      </button>
+      <button class="nav-btn" data-view="builder" onclick="switchView('builder', this)">
+        <span class="icon">🎯</span> 工作流构建
+      </button>
+      <button class="nav-btn" data-view="roles" onclick="switchView('roles', this)">
+        <span class="icon">👥</span> 角色库
+      </button>
+      <button class="nav-btn" data-view="templates" onclick="switchView('templates', this)">
+        <span class="icon">📋</span> 模板
+      </button>
+    </nav>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <div class="chip">
+        <span>🤖</span>
+        <select id="provider-select" onchange="onProviderChange(this.value)">
+          <option value="deepseek" selected>DeepSeek</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="gemini-cli">Gemini CLI</option>
+          <option value="copilot-cli">Copilot CLI</option>
+          <option value="ollama">Ollama</option>
+        </select>
+      </div>
+      <div class="chip">
+        <span>🌐</span>
+        <select id="lang-select">
+          <option value="auto" selected>自动</option>
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="chip">
+        <div class="pulse-dot" id="status-dot"></div>
+        <span id="ao-version">v0.x.x</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       WORKSPACE
+       ============================================================ -->
+  <div class="workspace">
+
+    <!-- LEFT ICON SIDEBAR -->
+    <aside class="sidebar">
+      <button class="sidebar-icon active" onclick="switchView('compose', null); setSideIcon(this)">
+        ✨<span class="tip">自动编排</span>
+      </button>
+      <button class="sidebar-icon" onclick="switchView('builder', null); setSideIcon(this)">
+        🎯<span class="tip">工作流构建</span>
+      </button>
+      <button class="sidebar-icon" onclick="switchView('roles', null); setSideIcon(this)">
+        👥<span class="tip">角色库 180+</span>
+      </button>
+      <button class="sidebar-icon" onclick="switchView('templates', null); setSideIcon(this)">
+        📋<span class="tip">模板库</span>
+      </button>
+      <div class="sidebar-sep"></div>
+      <button class="sidebar-icon" id="btn-settings" onclick="showToast('设置功能即将上线', 'info')">
+        ⚙️<span class="tip">设置</span>
+      </button>
+      <div class="sidebar-bottom">
+        <button class="sidebar-icon" onclick="showToast('帮助文档即将上线', 'info')">
+          ❓<span class="tip">帮助</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN PANEL -->
+    <main class="main-panel">
+
+      <!-- ========================================================
+           VIEW: 自动编排
+           ======================================================== -->
+      <div class="view active" id="view-compose">
+        <div class="compose-layout">
+
+          <!-- Left: config panel -->
+          <div class="compose-left">
+            <div class="panel-header">
+              <div class="panel-title">✨ 自动编排</div>
+              <div class="panel-subtitle">描述你的需求，AI 自动选择最优角色组合</div>
+            </div>
+
+            <div class="panel-body">
+              <div class="form-field">
+                <label class="form-label">需求描述</label>
+                <textarea id="compose-desc" rows="5" placeholder="例如：我是一个程序员，想用 AI 做自媒体副业，目标月入 2 万，帮我制定完整计划…"></textarea>
+              </div>
+
+              <div class="row-2">
+                <div class="form-field">
+                  <label class="form-label">角色语言</label>
+                  <select id="compose-lang">
+                    <option value="auto" selected>自动检测</option>
+                    <option value="zh">中文角色</option>
+                    <option value="en">英文角色</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label class="form-label">并发数</label>
+                  <input type="number" id="compose-concurrency" value="2" min="1" max="10">
+                </div>
+              </div>
+
+              <div class="row-2">
+                <div class="form-field">
+                  <label class="form-label">最大步骤</label>
+                  <input type="number" id="compose-max-steps" value="6" min="1" max="20">
+                </div>
+                <div class="form-field">
+                  <label class="form-label">超时 (秒)</label>
+                  <input type="number" id="compose-timeout" value="300" min="30" max="3600">
+                </div>
+              </div>
+
+              <label class="toggle-row form-field">
+                <input type="checkbox" id="compose-auto-run" checked>
+                生成后自动执行工作流
+              </label>
+
+              <div class="divider-line"></div>
+
+              <div class="section-label">💡 快速示例</div>
+
+              <div class="example-item" onclick="fillExample(0)">
+                <span class="example-icon">🚀</span>
+                程序员 AI 副业规划
+              </div>
+              <div class="example-item" onclick="fillExample(1)">
+                <span class="example-icon">📱</span>
+                AI 工具可行性分析
+              </div>
+              <div class="example-item" onclick="fillExample(2)">
+                <span class="example-icon">🎓</span>
+                10 万启动 AI 教育项目
+              </div>
+              <div class="example-item" onclick="fillExample(3)">
+                <span class="example-icon">🔒</span>
+                代码安全审计报告
+              </div>
+              <div class="example-item" onclick="fillExample(4)">
+                <span class="example-icon">📊</span>
+                市场竞品深度调研
+              </div>
+            </div>
+
+            <div class="panel-footer">
+              <button class="btn btn-secondary" id="btn-preview" onclick="runPreview()">
+                📝 生成 YAML
+              </button>
+              <button class="btn btn-primary" id="btn-run" style="flex:1" onclick="runOrchestration()">
+                ▶ 编排并运行
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: output area -->
+          <div class="compose-right">
+            <!-- stats bar -->
+            <div class="stats-bar" id="stats-bar">
+              <div class="stat">
+                <span class="stat-label">角色数</span>
+                <span class="stat-val" id="stat-agents">—</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">步骤</span>
+                <span class="stat-val" id="stat-steps">—</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">并发</span>
+                <span class="stat-val" id="stat-concurrency">—</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">状态</span>
+                <span class="stat-val" id="stat-status">就绪</span>
+              </div>
+              <div style="flex:1"></div>
+              <div id="run-badge" class="hidden" style="padding: 0 14px;">
+                <span class="run-indicator">
+                  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.2s infinite"></span>
+                  运行中
+                </span>
+              </div>
+            </div>
+
+            <!-- output tabs -->
+            <div class="output-tabs">
+              <button class="output-tab active" onclick="switchOutputTab('workflow', this)">📊 工作流</button>
+              <button class="output-tab" onclick="switchOutputTab('dag', this)">🔀 DAG 图</button>
+              <button class="output-tab" onclick="switchOutputTab('log', this)">📟 实时日志</button>
+              <button class="output-tab" onclick="switchOutputTab('yaml', this)">📄 YAML</button>
+              <div class="output-spacer"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-clear" onclick="clearOutput()">清空</button>
+            </div>
+
+            <!-- output panes -->
+            <div class="output-body">
+              <!-- Workflow pane -->
+              <div class="output-pane active" id="pane-workflow">
+                <div class="workflow-canvas" id="workflow-canvas">
+                  <div class="empty-state" id="workflow-empty">
+                    <div class="empty-icon">🤖</div>
+                    <div class="empty-title">等待编排指令</div>
+                    <div class="empty-desc">在左侧输入需求描述，点击「编排并运行」自动规划多 Agent 工作流</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DAG pane -->
+              <div class="output-pane" id="pane-dag">
+                <div class="workflow-canvas" id="dag-canvas">
+                  <div class="empty-state">
+                    <div class="empty-icon">🔀</div>
+                    <div class="empty-title">DAG 图</div>
+                    <div class="empty-desc">运行后展示工作流有向无环图</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Log pane -->
+              <div class="output-pane" id="pane-log">
+                <div class="log-terminal" id="log-terminal">
+                  <span class="log-muted"># 等待任务启动...</span>
+                </div>
+              </div>
+
+              <!-- YAML pane -->
+              <div class="output-pane" id="pane-yaml">
+                <div class="yaml-block" id="yaml-block">
+<span class="y-comment"># 点击「生成 YAML」或「编排并运行」后将在此显示工作流配置</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /view-compose -->
+
+      <!-- ========================================================
+           VIEW: 工作流构建器
+           ======================================================== -->
+      <div class="view" id="view-builder">
+        <div class="builder-layout">
+
+          <!-- left: role picker -->
+          <div class="builder-left">
+            <div class="panel-header">
+              <div class="panel-title">🎯 角色组合</div>
+              <div class="panel-subtitle">手动拖拽选择角色，构建工作流</div>
+            </div>
+
+            <!-- mini role list -->
+            <div class="panel-body" id="builder-role-list">
+              <div class="form-field">
+                <input type="text" placeholder="🔍 搜索角色…" id="builder-search" oninput="filterBuilderRoles(this.value)">
+              </div>
+              <div id="builder-roles-container"></div>
+            </div>
+
+            <div class="panel-footer" style="flex-direction:column; gap:10px; align-items:stretch;">
+              <div class="form-field" style="margin:0">
+                <label class="form-label">工作流名称</label>
+                <input type="text" id="wf-name" placeholder="我的工作流">
+              </div>
+              <div class="row-2">
+                <button class="btn btn-secondary btn-sm" onclick="clearWorkflow()">清空</button>
+                <button class="btn btn-primary btn-sm" onclick="runBuilderWorkflow()">▶ 运行</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- center: canvas -->
+          <div class="builder-center">
+            <div style="padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0;">
+              <span style="font-size:13px;font-weight:600;color:var(--text)">构建画布</span>
+              <span id="wf-step-count" class="tag tag-neutral" style="font-size:11px;">0 步骤</span>
+              <div style="flex:1"></div>
+              <button class="btn btn-secondary btn-sm" onclick="exportBuilderYaml()">📄 导出 YAML</button>
+            </div>
+
+            <div class="builder-canvas" id="builder-canvas">
+              <div class="empty-state" id="builder-empty">
+                <div class="empty-icon">🎯</div>
+                <div class="empty-title">画布为空</div>
+                <div class="empty-desc">从左侧角色库点击「+ 添加」，将角色加入工作流</div>
+              </div>
+              <div id="builder-steps" class="hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /view-builder -->
+
+      <!-- ========================================================
+           VIEW: 角色库
+           ======================================================== -->
+      <div class="view" id="view-roles">
+        <div class="roles-layout">
+
+          <!-- sidebar: departments -->
+          <nav class="roles-sidebar">
+            <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;padding:4px 10px 10px;">部门</div>
+            <div class="cat-item active" onclick="filterDept('all', this)">
+              <span>全部</span>
+              <span class="cat-count" id="total-count">180</span>
+            </div>
+            <div id="dept-list"></div>
+          </nav>
+
+          <!-- main: grid -->
+          <div class="roles-main">
+            <div class="roles-toolbar">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" placeholder="搜索角色名称或描述…" id="role-search" oninput="searchRoles(this.value)">
+              </div>
+              <div class="chip" style="flex-shrink:0;">
+                <span id="role-count-label">180 个角色</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="addAllToBuilder()">批量添加到构建器</button>
+            </div>
+            <div class="roles-grid" id="roles-grid"></div>
+          </div>
+        </div>
+      </div><!-- /view-roles -->
+
+      <!-- ========================================================
+           VIEW: 模板
+           ======================================================== -->
+      <div class="view" id="view-templates">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; gap:12px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;">模板库</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">精选工作流模板，一键载入运行</div>
+          </div>
+          <div style="flex:1"></div>
+          <div class="search-box" style="width:280px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="搜索模板…" id="tmpl-search" oninput="searchTemplates(this.value)">
+          </div>
+        </div>
+        <div class="templates-grid" id="templates-grid"></div>
+      </div><!-- /view-templates -->
+
+    </main>
+  </div><!-- /workspace -->
+</div><!-- /app -->
+
+<!-- Toast container -->
+<div class="toast-stack" id="toast-stack"></div>
+
+<!-- ============================================================
+     DATA: agent catalog (embedded, fallback)
+     ============================================================ -->
+<script src="src/data/agent-catalog.js"></script>
+
+<!-- Main application logic -->
+<script src="ao-console.js"></script>
+</body>
+</html>

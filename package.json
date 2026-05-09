@@ -1,0 +1,33 @@
+{
+  "name": "ao-console-server",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Agency Orchestrator 可视化控制台 - 为多智能体编排引擎提供图形化操作界面",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --watch",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [
+    "agency-orchestrator",
+    "ai-agent",
+    "workflow",
+    "multi-agent",
+    "visual-console"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  " AO_ENV": {
+    "AO_CWD": "D:/SourceCode/agency-agents-zh",
+    "PORT": 3000
+  }
+}
