@@ -14,7 +14,7 @@
 
 ## 运行截图
 
-![自动编排视图]([./runpic/1.png](https://github.com/longwinceGit/agency-agents-html/blob/main/runpic/1.png))
+![自动编排视图](https://github.com/longwinceGit/agency-agents-html/blob/main/runpic/1.png)
 *自动编排视图 — 左侧输入需求描述，右侧实时展示工作流与执行进度*
 
 ![工作流构建视图](./runpic/2.png)
