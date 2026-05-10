@@ -255,6 +255,18 @@ function runOrchestration() {
         if (data.executing) {
           appendLog('[META] 开始执行工作流...', 'sys');
         }
+        // compose 完成，YAML 已生成
+        if (data.phase === 'compose_done' && data.yamlContent) {
+          const escaped = data.yamlContent
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const highlighted = escaped
+            .replace(/^(\s*)([\w_-]+):/gm, '$1<span class="y-key">$2</span>:')
+            .replace(/: "(.*?)"/g, ': <span class="y-str">"$1"</span>')
+            .replace(/: (\d+)/g, ': <span class="y-num">$1</span>')
+            .replace(/(#.*)/g, '<span class="y-comment">$1</span>');
+          appendYaml(highlighted);
+          appendLog('[META] 工作流 YAML 已生成' + (autoRun ? '，准备执行...' : ''), 'sys');
+        }
       } else if (data.type === 'summary') {
         // 执行汇总
         appendLog(`[SUMMARY] 完成: ${data.completed}/${data.total} 步 | ${data.duration}s | ${data.tokens} tokens`, 'ok');
@@ -294,7 +306,10 @@ function runOrchestration() {
       document.getElementById('btn-preview').disabled = false;
 
       const success = data && data.code === 0;
-      document.getElementById('stat-status').textContent = success ? '✅ 完成' : '❌ 失败';
+      const phase = data && data.phase;
+      const isComposeOnly = phase === 'compose';
+
+      document.getElementById('stat-status').textContent = success ? (isComposeOnly ? '📝 YAML 已生成' : '✅ 完成') : '❌ 失败';
 
       // 如果后端返回了步骤信息，使用它
       if (data.steps && data.steps.length > 0 && discoveredSteps.length === 0) {
@@ -303,14 +318,19 @@ function runOrchestration() {
 
       // 所有步骤标记为最终状态
       if (discoveredSteps.length > 0) {
-        renderWorkflowSteps(discoveredSteps.map(s => ({ ...s, status: success ? 'done' : (s.status === 'error' ? 'error' : 'done') })));
+        const finalStatus = isComposeOnly ? 'pending' : (success ? 'done' : (s => s.status === 'error' ? 'error' : 'done'));
+        renderWorkflowSteps(discoveredSteps.map(s => ({ ...s, status: typeof finalStatus === 'function' ? finalStatus(s) : finalStatus })));
         renderDag(discoveredSteps);
+        // 自动切换到 DAG 视图（仅运行完成后）
+        if (!isComposeOnly) {
+          switchOutputTab('dag', null);
+        }
       } else {
         // 如果没有解析到步骤信息，至少显示完成
         appendLog('[SYSTEM] 编排完成（未能解析步骤详情）', success ? 'ok' : 'err');
       }
 
-      appendLog(success ? '[SYSTEM] 所有步骤已完成' : '[SYSTEM] 执行异常退出', success ? 'ok' : 'err');
+      appendLog(success ? (isComposeOnly ? '[SYSTEM] 工作流 YAML 已生成，可点击运行' : '[SYSTEM] 所有步骤已完成') : '[SYSTEM] 执行异常退出', success ? 'ok' : 'err');
       showToast(success ? '工作流执行完成！' : '工作流执行失败', success ? 'success' : 'error');
     }
   ).catch(err => {

@@ -864,10 +864,12 @@ app.post('/api/compose/stream', async (req, res) => {
   res.write(':\n\n');
 
   // 第一阶段：ao compose 生成 YAML（不使用 --run，避免 agents_dir 错误）
-  const outputFileName = `composed-${Date.now()}.yaml`;
+  // ao compose 使用 --name 指定文件名（不含 .yaml 后缀）
+  const outputName = `composed-${Date.now()}`;
+  const outputFileName = outputName + '.yaml';
   const yamlPath = path.join(WORKFLOWS_DIR, outputFileName);
 
-  const composeArgs = ['compose', description, '--output', yamlPath];
+  const composeArgs = ['compose', description, '--name', outputName];
   if (provider) {
     composeArgs.push('--provider', String(provider));
   }
@@ -915,10 +917,30 @@ app.post('/api/compose/stream', async (req, res) => {
 
     // 读取并修复生成的 YAML
     let yamlContent = '';
-    if (fs.existsSync(yamlPath)) {
-      yamlContent = fs.readFileSync(yamlPath, 'utf-8');
-    } else if (composeStdout) {
-      const yamlMatch = composeStdout.match(/^name:[\s\S]*$/m);
+    // 尝试多个可能的路径（ao compose --name 可能生成到不同位置）
+    const possiblePaths = [
+      yamlPath,
+      path.join(AO_CWD, 'workflows', outputFileName),
+    ];
+    // 从 stdout 中提取实际文件名作为备选路径
+    const actualFileMatch = composeStdout.match(/工作流已生成[:：]\s*(.+?)[\n\r]/);
+    if (actualFileMatch) {
+      const actualPath = actualFileMatch[1].trim();
+      if (!possiblePaths.includes(actualPath)) {
+        possiblePaths.unshift(actualPath.startsWith('/') || actualPath.match(/^[A-Za-z]:/) ? actualPath : path.join(AO_CWD, actualPath));
+      }
+    }
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        yamlContent = fs.readFileSync(p, 'utf-8');
+        // 更新 yamlPath 为实际路径，用于后续 ao run
+        if (p !== yamlPath) yamlPath = p;
+        break;
+      }
+    }
+    if (!yamlContent && composeStdout) {
+      // 尝试从 stdout 提取 YAML 内容
+      const yamlMatch = composeStdout.match(/name:[\s\S]*?(?=\n  接下来可以)/);
       if (yamlMatch) {
         yamlContent = yamlMatch[0].trim();
       }
@@ -927,6 +949,27 @@ app.post('/api/compose/stream', async (req, res) => {
     if (yamlContent) {
       yamlContent = fixAgentsDir(yamlContent);
       fs.writeFileSync(yamlPath, yamlContent, 'utf-8');
+    }
+
+    // 解析 YAML 提取步骤信息，发送 plan 事件（ao compose 不输出"参与者:"，需从 YAML 提取）
+    if (yamlContent) {
+      try {
+        const wf = yaml.load(yamlContent);
+        if (wf && wf.steps && Array.isArray(wf.steps)) {
+          plannedSteps = wf.steps.map((s, i) => ({
+            id: s.id || `step_${i + 1}`,
+            name: s.name || s.role || `Step ${i + 1}`,
+            emoji: s.emoji || '🤖',
+            role: s.role || '',
+            dept: (s.role || '').split('/')[0] || '',
+            desc: s.task ? s.task.replace(/\{\{[^}]+\}\}/g, '...').substring(0, 60) : '',
+            status: 'pending',
+          }));
+          res.write(`data: ${JSON.stringify({ type: 'plan', steps: plannedSteps, source: 'yaml' })}\n\n`);
+        }
+      } catch (e) {
+        // YAML 解析失败，忽略
+      }
     }
 
     // 发送 YAML 生成完成的元数据事件
@@ -1092,6 +1135,24 @@ app.post('/api/run/stream', async (req, res) => {
 
   let plannedSteps = null;
 
+  // 预先解析 YAML 提取步骤信息（ao run 的"参与者:"输出可能无法解析）
+  try {
+    const yamlContent = fs.readFileSync(workflowPath, 'utf-8');
+    const wf = yaml.load(yamlContent);
+    if (wf && wf.steps && Array.isArray(wf.steps)) {
+      plannedSteps = wf.steps.map((s, i) => ({
+        id: s.id || `step_${i + 1}`,
+        name: s.name || s.role || `Step ${i + 1}`,
+        emoji: s.emoji || '🤖',
+        role: s.role || '',
+        dept: (s.role || '').split('/')[0] || '',
+        desc: s.task ? s.task.replace(/\{\{[^}]+\}\}/g, '...').substring(0, 60) : '',
+        status: 'pending',
+      }));
+      res.write(`data: ${JSON.stringify({ type: 'plan', steps: plannedSteps, source: 'yaml' })}\n\n`);
+    }
+  } catch (e) {}
+
   const child = runAoCommandStream(args, (data) => {
     // 发送原始输出
     res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -1248,6 +1309,19 @@ steps:
   res.write(':\n\n'); // 心跳
 
   let plannedSteps = null;
+
+  // 单角色工作流，直接发送 plan 事件
+  const roleEmoji = (role in { '🤖': 1 }) ? '🤖' : '🤖';
+  plannedSteps = [{
+    id: 'single_role_step',
+    name: task.substring(0, 20) + (task.length > 20 ? '...' : ''),
+    emoji: roleEmoji,
+    role: role,
+    dept: role.split('/')[0] || '',
+    desc: task.substring(0, 60),
+    status: 'pending',
+  }];
+  res.write(`data: ${JSON.stringify({ type: 'plan', steps: plannedSteps, source: 'yaml' })}\n\n`);
 
   const child = runAoCommandStream(args, (data) => {
     // 发送原始输出

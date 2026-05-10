@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --watch",
+    "generate-catalog": "node scripts/generate-catalog.js",
     "test": "echo \"No tests yet\""
   },
   "keywords": [
